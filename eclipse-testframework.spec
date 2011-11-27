@@ -4,7 +4,7 @@
 
 Name:           eclipse-testframework
 Version:        3.6.1
-Release:        2
+Release:        4
 Summary:        Eclipse Test Framework
 
 Group:          Development/Java
