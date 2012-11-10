@@ -1,0 +1,157 @@
+--- org.eclipse.test/library.xml.orig	2009-10-01 18:06:41.000000000 +0300
++++ org.eclipse.test/library.xml	2010-07-14 17:49:04.722008894 +0300
+@@ -6,13 +6,13 @@
+ 	</target>
+ 
+ 	<target name="init">
+-		<!-- 
++		<!--
+ 			Parameters:
+ 				(Mandatory)
+ 				data-dir		- the directory for Eclipse to write its data
+ 				plugin-name		- the name of the plugin to test
+ 				classname		- the name of the test class
+-				
++
+ 				(Optional - overrides defaults set in script)
+ 				vmargs			- a string containing arguments to pass to the VM.
+ 				extraVMargs		- allows separate setting of VM args from separate caller.
+@@ -22,7 +22,7 @@
+ 				useEclipseExe	- property setting forces test to launch via eclipse executable.
+ 				junit-report-output - output directory for junit reports produced for specified classname.
+ 		-->
+-		
++
+ 	  	<tstamp>
+ 	        <format property="TIMENOW" pattern="HHmmssSSSS"/>
+ 	    </tstamp>
+@@ -38,10 +38,15 @@
+ 	    <condition property="vmargs" value=" -Xms256M -Xmx512M">
+ 			<equals arg1="${test.target}" arg2="performance" />
+ 	    </condition>
++		<condition property="extraVMargs" value=" -Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=40000">
++		                    <equals arg1="${debugTests}" arg2="true" />
++		</condition>
+ 		<property name="extraVMargs" value=""/>
+ 		<property name="plugin-path" value="" />
++		<property name="tmpresults" value="${eclipse-home}/tmpresults/" />
++		<property name="testhome" value="${eclipse-home}/testhome" />
+ 		<property name="timeout" value="7200000" />
+-		<property name="test-output" value="${eclipse-home}/${classname}.xml" />
++		<property name="test-output" value="${tmpresults}/${classname}.xml" />
+ 		<property name="junit-report-output" value="${eclipse-home}/results" />
+ 		<mkdir dir="${junit-report-output}"/>
+ 	</target>
+@@ -60,7 +65,11 @@
+ 
+ 	<target name="java-test">
+ 		<!--default vm args-->
+-		<property name="vmargs" value=" -Xms40m -Xmx348m"/>
++		<property name="vmargs" value=" -Xms256m -Xmx1024m -XX:MaxPermSize=512m"/>
++		<delete failonerror="false" includeEmptyDirs="true">
++		  <fileset dir="${testhome}" includes="**/*"/>
++		</delete>
++		<mkdir dir="${testhome}"/>
+ 	  	
+ 	  	<!--set default jvm to use for testing-->
+ 	   	<property name="jvm" value="${java.home}/bin/java" />  	
+@@ -75,7 +84,7 @@
+ 	          	</fileset>
+ 	        </classpath>
+ 		    <arg line="-application ${application}"/>
+-		    <arg line="-data ${data-dir}"/>
++		    <arg line="-data ${test-data-dir}"/>
+ 		    <arg line="formatter=${formatter},${test-output}"/>
+ 		    <arg line="-testPluginName ${plugin-name}"/>
+ 		    <arg line="-className ${classname}"/>
+@@ -83,15 +92,31 @@
+ 		    <arg line="-ws ${ws}"/>
+ 		    <arg line="-arch ${arch}"/>
+ 		    <arg line="-consolelog"/>
++			<arg line="-clean"/>
++			<arg line="-Dswt.library.path=/usr/lib/eclipse"/>
++			<arg line="-Dsetup.override.vmArgs=Xms256m;Xmx1024m"/>
++			<arg line="-Dsetup.override.systemProperties=PLUGIN_PATH=${plugin-path};user.home=${testhome}"/>
+ 		    <jvmarg line="${vmargs} ${extraVMargs}"/>
+-		    <sysproperty key="PLUGIN_PATH" value="${plugin-path}"/> 
++		    <sysproperty key="PLUGIN_PATH" value="${plugin-path}"/>
++			<sysproperty key="user.home" value="${testhome}"/>
++			<sysproperty key="swt.library.path" value="/usr/lib/eclipse"/>
++			<sysproperty key="setup.override.vmArgs" value="Xms256m;Xmx1024m"/>
++			<sysproperty key="setup.override.systemProperties" value="PLUGIN_PATH=${plugin-path};user.home=${testhome}"/>
++			<sysproperty key="sdk.tests.data.dir" value="${data-dir}"/>
++			<sysproperty key="org.eclipse.equinox.p2.reconciler.tests.platform.archive" value="${tmpresults}/eclipse-platform-archive.tar.gz"/>
++			<sysproperty key="osgi.configuration.area" value="${data-dir}"/>
+ 		</java>
+ 		<antcall target="collect-results" />
+ 	</target>
+-	
+-	<target name="eclipse-test" description="Runs the specified classname as a plug-in test.">		
++
++	<target name="eclipse-test" description="Runs the specified classname as a plug-in test.">
+ 		<property name="vmargs" value="-Xms256m -Xmx512m"/>
+-		
++
++		<delete failonerror="false" includeEmptyDirs="true">
++		  <fileset dir="${testhome}" includes="**/*"/>
++		</delete>
++		<mkdir dir="${testhome}"/>
++
+ 		<!--use -consolelog if launching a headless test-->
+ 		<condition property="consolelog" value="-consolelog">
+ 			<equals arg1="${application}" arg2="org.eclipse.test.coretestapplication"/>
+@@ -107,11 +132,11 @@
+ 			<isset property="jvm" />
+ 		</condition>
+ 		<property name="test-vm" value="" />
+-		
++
+ 		<!--ensure executable has execute permission-->
+ 		<chmod file="${eclipse-home}/eclipse" perm="ugo+rx"/>
+-		
+-		
++
++
+ 		<echo message="Running ${classname}. Result file: ${junit-report-output}/${classname}.xml."/>
+ 
+ 		<exec executable="${eclipse-home}/eclipse" dir="${eclipse-home}" timeout="${timeout}" logError="true" failonerror="false" output="${junit-report-output}/${classname}.txt">
+@@ -125,10 +150,12 @@
+ 			<arg line="--launcher.suppressErrors"/>
+ 			<arg line="${consolelog}"/>
+ 			<arg line="-vmargs ${vmargs} ${extraVMargs} -DPLUGIN_PATH=${plugin-path}"/>
++			<arg line="-Duser.home=${testhome}"/>
++			<arg line="-Dsetup.override.systemProperties=PLUGIN_PATH=${plugin-path};user.home=${testhome}"/>
+ 		</exec>
+ 		<antcall target="collect-results" />
+ 	</target>
+-	
++
+ 	<target name="collect-results">
+ 		<dirname property="output-dir" file="${test-output}"/>
+ 		<basename property="output-file-name" file="${test-output}"/>
+@@ -138,7 +165,7 @@
+ 			</fileset>
+ 		</junitreport>
+ 
+-		<xslt style="${eclipse-home}/dropins/eclipse/plugins/org.eclipse.test/JUNIT.XSL"
++		<xslt style="${eclipse-home}/dropins/sdk/plugins/org.eclipse.test/JUNIT.XSL"
+ 			basedir="${junit-report-output}"
+ 			includes="${classname}.result.xml"
+ 			destdir="${junit-report-output}" />
+@@ -153,13 +180,13 @@
+ 	<target name="collect">
+ 		<!--
+ 			This target can be used to aggragate test runs from multiple test suites into a single report.
+-		
++
+ 			Parameters to this target:
+ 			includes		- the names of the files to include
+ 			output-file		- the name of the output file to produce
+ 		-->
+-		<junitreport todir="." tofile="${output-file}">
+-			<fileset dir=".">
++		<junitreport todir="${results}" tofile="${output-file}">
++			<fileset dir="${tmpresults}">
+ 				<include name="${includes}"/>
+ 			</fileset>
+ 		</junitreport>
