@@ -9,7 +9,7 @@ Summary:        Eclipse Test Framework
 
 Group:          Development/Java
 License:        EPL
-URL:            http://eclipse.org
+URL:            https://eclipse.org
 ## sh %{name}-fetch-src.sh %{tag}
 Source0:        %{name}-fetched-src-%{tag}.tar.bz2
 Source1:        %{name}-fetch-src.sh
